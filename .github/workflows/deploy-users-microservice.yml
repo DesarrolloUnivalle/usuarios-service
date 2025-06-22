@@ -52,12 +52,12 @@ jobs:
       - name: Set up gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: gcp-despliegue-desarrollo
+          project_id: gcp-despliegue-desarrollo 
           install_components: 'gke-gcloud-auth-plugin'
 
       - name: Configure kubectl
         run: |
-          gcloud container clusters get-credentials desarrollo-cluster --region us-central1 --project gcp-despliegue-desarrollo
+          gcloud container clusters get-credentials cluster-desarrollo --zone us-central1-c --project gcp-despliegue-desarrollo
 
       - name: Deploy to GKE
         run: |
