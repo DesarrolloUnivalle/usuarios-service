@@ -102,7 +102,7 @@ jobs:
       - name: Set up GKE credentials
         uses: google-github-actions/get-gke-credentials@v1
         with:
-          cluster_name: cluster-1
+          cluster_name: desarrollo-cluster
           location: us-central1
           project_id: gcp-despliegue-desarrollo
 
