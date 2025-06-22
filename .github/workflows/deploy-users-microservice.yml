@@ -87,3 +87,29 @@ jobs:
         run: |
           minikube stop
           minikube delete
+  deploy-to-gke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up GKE credentials
+        uses: google-github-actions/get-gke-credentials@v1
+        with:
+          cluster_name: cluster-1
+          location: us-central1
+          project_id: gcp-despliegue-desarrollo
+
+      - name: Deploy to GKE
+        run: |
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          envsubst < ${{ env.K8S_DIR }}/deployment.yml > ${{ env.K8S_DIR }}/deployment-processed.yml
+          kubectl apply -f ${{ env.K8S_DIR }}/deployment-processed.yml
+          kubectl apply -f ${{ env.K8S_DIR }}/service.yml
+          kubectl rollout status deployment/${{ env.SERVICE_NAME }}-deployment --timeout=120s
