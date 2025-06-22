@@ -1,22 +1,15 @@
-FROM maven:3.9.9-eclipse-temurin-21 AS build
+# Imagen base con soporte para Java 21
+FROM eclipse-temurin:21-jdk-alpine
+
+# Establece el directorio de trabajo dentro del contenedor
 WORKDIR /app
 
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
+# Copia el jar generado desde el directorio target al contenedor
+ARG JAR_FILE=target/usuarios-service-1.0.0.jar
+COPY ${JAR_FILE} app.jar
 
-COPY src ./src
-RUN mvn clean package -DskipTests
-
-FROM eclipse-temurin:21-jdk-jammy
-
-RUN groupadd --system spring && useradd --system spring --gid spring
-USER spring:spring
-
-WORKDIR /app
-COPY --from=build --chown=spring:spring /app/target/*.jar app.jar
+# Expone el puerto en el que tu servicio escucha (ajusta si es distinto)
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost:8080/actuator/health || exit 1
-
+# Comando que se ejecutará al iniciar el contenedor
 ENTRYPOINT ["java", "-jar", "app.jar"]

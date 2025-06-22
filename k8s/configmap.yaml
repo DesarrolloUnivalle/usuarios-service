@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: usuarios-config
+data:
+  DB_URL: jdbc:postgresql://ep-withered-king-aa21vv8q-pooler.westus3.azure.neon.tech:5432/neondb?sslmode=require
+  JWT_ISSUER: miapp
+  EUREKA_URL: http://localhost:8761/eureka/
