@@ -41,6 +41,49 @@ jobs:
           docker build -t ${{ env.DOCKER_IMAGE }}:latest .
           docker push ${{ env.DOCKER_IMAGE }}:latest
 
+      # ========================
+      # === Despliegue en GKE ===
+      # ========================
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: gcp-despliegue-desarrollo
+          install_components: 'gke-gcloud-auth-plugin'
+
+      - name: Configure kubectl
+        run: |
+          gcloud container clusters get-credentials cluster-1 \
+            --region us-central1 \
+            --project gcp-despliegue-desarrollo
+
+      - name: Deploy to GKE
+        run: |
+          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+          envsubst < ${{ env.K8S_DIR }}/deployment.yml > ${{ env.K8S_DIR }}/deployment-processed.yml
+          kubectl apply -f ${{ env.K8S_DIR }}/deployment-processed.yml
+          kubectl apply -f ${{ env.K8S_DIR }}/service.yml
+          kubectl rollout status deployment/${{ env.SERVICE_NAME }}-deployment --timeout=120s
+
+      - name: Debug deployment failure
+        if: failure()
+        run: |
+          echo "==== PODS ===="
+          kubectl get pods -o wide
+          
+          echo "==== DESCRIBE POD ===="
+          kubectl describe pod $(kubectl get pod -l app=${{ env.SERVICE_NAME }} -o jsonpath="{.items[0].metadata.name}")
+          
+          echo "==== LOGS ===="
+          kubectl logs $(kubectl get pod -l app=${{ env.SERVICE_NAME }} -o jsonpath="{.items[0].metadata.name}")
+
+      # ==================================
+      # === Despliegue LOCAL con Minikube ===
+      # ==================================
       - name: Install Minikube
         run: |
           curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
@@ -55,61 +98,25 @@ jobs:
 
       - name: Deploy to Minikube
         run: |
-          # Configurar el entorno de Docker de Minikube
           eval $(minikube -p minikube docker-env)
-          # Construir la imagen en el entorno de Minikube
           docker build -t ${{ env.DOCKER_IMAGE }}:latest .
-          # Reemplazar variables en los archivos de Kubernetes
           export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
           envsubst < ${{ env.K8S_DIR }}/deployment.yml > ${{ env.K8S_DIR }}/deployment-processed.yml
-          # Aplicar los manifiestos de Kubernetes
           kubectl apply -f ${{ env.K8S_DIR }}/deployment-processed.yml
           kubectl apply -f ${{ env.K8S_DIR }}/service.yml
-          # Verificar el estado de los pods
           kubectl get pods
           kubectl describe pods
-          # Esperar a que el despliegue esté listo
           kubectl rollout status deployment/${{ env.SERVICE_NAME }}-deployment --timeout=120s
 
-      - name: Verify deployment
+      - name: Verify Minikube deployment
         run: |
-          # Esperar a que el servicio esté listo
           sleep 30
-          # Obtener la IP de Minikube
           MINIKUBE_IP=$(minikube ip)
-          # Verificar health endpoint
           curl -sSf http://$MINIKUBE_IP:30080/actuator/health
-          # Verificar prometheus endpoint
           curl -sSf http://$MINIKUBE_IP:30080/actuator/prometheus | head -n 5
 
-      - name: Cleanup
+      - name: Cleanup Minikube
         if: always()
         run: |
           minikube stop
           minikube delete
-  deploy-to-gke:
-    needs: deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Authenticate with Google Cloud
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up GKE credentials
-        uses: google-github-actions/get-gke-credentials@v1
-        with:
-          cluster_name: desarrollo-cluster
-          location: us-central1
-          project_id: gcp-despliegue-desarrollo
-
-      - name: Deploy to GKE
-        run: |
-          export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
-          envsubst < ${{ env.K8S_DIR }}/deployment.yml > ${{ env.K8S_DIR }}/deployment-processed.yml
-          kubectl apply -f ${{ env.K8S_DIR }}/deployment-processed.yml
-          kubectl apply -f ${{ env.K8S_DIR }}/service.yml
-          kubectl rollout status deployment/${{ env.SERVICE_NAME }}-deployment --timeout=120s
