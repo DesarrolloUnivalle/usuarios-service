@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - test-workflow
 
 env:
   SERVICE_NAME: usuarios-service
@@ -57,9 +56,7 @@ jobs:
 
       - name: Configure kubectl
         run: |
-          gcloud container clusters get-credentials cluster-1 \
-            --region us-central1 \
-            --project gcp-despliegue-desarrollo
+          gcloud container clusters get-credentials desarrollo-cluster --region us-central1 --project gcp-despliegue-desarrollo
 
       - name: Deploy to GKE
         run: |
