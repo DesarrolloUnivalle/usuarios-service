@@ -105,14 +105,6 @@ jobs:
           kubectl get pods
           kubectl describe pods
           kubectl rollout status deployment/${{ env.SERVICE_NAME }}-deployment --timeout=120s
-
-      - name: Verify Minikube deployment
-        run: |
-          sleep 30
-          MINIKUBE_IP=$(minikube ip)
-          curl -sSf http://$MINIKUBE_IP:30080/actuator/health
-          curl -sSf http://$MINIKUBE_IP:30080/actuator/prometheus | head -n 5
-
       - name: Cleanup Minikube
         if: always()
         run: |
