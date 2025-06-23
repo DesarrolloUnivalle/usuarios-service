@@ -10,16 +10,9 @@ import com.tienda.usuarios.dto.UserResponseDTO;
 import com.tienda.usuarios.model.User;
 import com.tienda.usuarios.service.UserService;
 
-import com.tienda.usuarios.security.JwtAuthFilter;
-import com.tienda.usuarios.security.JwtUtil;
-
 import org.springframework.security.core.Authentication;
 
-
 import com.tienda.usuarios.security.CustomUserDetails;
-
-import org.springframework.security.access.prepost.PreAuthorize;
-
 
 @RestController 
 @RequestMapping("/usuarios")

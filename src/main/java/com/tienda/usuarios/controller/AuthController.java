@@ -34,24 +34,19 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
-        try {
-            String username = credentials.get("email");
-            String password = credentials.get("password");
+        String username = credentials.get("email");
+        String password = credentials.get("password");
 
-            authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
 
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-            String token = jwtUtil.generateToken(userDetails);  // ✅ usa el método que ya tienes
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        String token = jwtUtil.generateToken(userDetails);
 
-
-
-            Map<String, String> response = new HashMap<>();
-            response.put("token", token);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Credenciales incorrectas");
-        }
+        Map<String, String> response = new HashMap<>();
+        response.put("token", token);
+        return ResponseEntity.ok(response);
     }
+
 
     @PostMapping("/register")
     public ResponseEntity<UserResponseDTO> register(@RequestBody UserRequestDTO request) {

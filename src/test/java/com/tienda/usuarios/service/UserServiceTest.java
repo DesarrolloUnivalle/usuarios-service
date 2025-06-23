@@ -1,4 +1,3 @@
-/* 
 package com.tienda.usuarios.service;
 
 import com.tienda.usuarios.dto.UserRequestDTO;
@@ -7,83 +6,170 @@ import com.tienda.usuarios.model.Role;
 import com.tienda.usuarios.model.User;
 import com.tienda.usuarios.repository.RoleRepository;
 import com.tienda.usuarios.repository.UserRepository;
-
-import jakarta.transaction.Transactional;
-
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
-import java.util.Optional;
-import java.util.List;
+import org.mockito.*;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
-@ExtendWith(SpringExtension.class)
-@SpringBootTest
-@Transactional  // ❗ Esto asegura que los datos creados en la prueba se revierten después de ejecutarla
-class RoleRepositoryTest {
-    @Autowired
-    private UserService userService;
 
-    @Autowired
+@ExtendWith(org.mockito.junit.jupiter.MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock
     private UserRepository userRepository;
 
-    @Autowired
+    @Mock
     private RoleRepository roleRepository;
+
+    @Mock
+    private BCryptPasswordEncoder passwordEncoder;
+
+    @InjectMocks
+    private UserService userService;
+
+    private User user;
+    private Role role;
+
+    @BeforeEach
+    void setUp() {
+        role = new Role();
+        role.setId(1);
+        role.setNombre("CLIENTE");
+
+        user = new User();
+        user.setId(100L);
+        user.setUsuarioId(1L);
+        user.setNombre("Juan");
+        user.setEmail("juan@example.com");
+        user.setPassword("encodedPass");
+        user.setRol(role);
+    }
+
     @Test
-    void testRegistrarUsuario_Exitoso() {
-        // 🔹 1️⃣ Preparar los datos
-        UserRequestDTO request = new UserRequestDTO();
-        request.setNombre("Carlos Perez");
-        request.setEmail("carlos.perez@example.com");
-        request.setPassword("securePassword123");
+    void getAllUsers_deberiaRetornarListaCompleta() {
+        List<User> users = List.of(user);
+        when(userRepository.findAll()).thenReturn(users);
 
-        // 🔹 2️⃣ Buscar un rol existente en la BD (por ejemplo, "Cliente")
-        Optional<Role> optionalRole = roleRepository.findByNombre("Cliente");
-        assertTrue(optionalRole.isPresent(), "El rol 'Cliente' debería existir en la base de datos");
-        request.setRol(optionalRole.get());
+        List<User> result = userService.getAllUsers();
 
-        // 🔹 3️⃣ Ejecutar el método de registro
+        assertEquals(1, result.size());
+        assertEquals("Juan", result.get(0).getNombre());
+    }
+
+    @Test
+    void getUserById_usuarioExiste_deberiaRetornarDTO() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        UserResponseDTO result = userService.getUserById(1L);
+
+        assertEquals(user.getNombre(), result.nombre());
+        assertEquals(user.getEmail(), result.email());
+        assertEquals(user.getRol().getNombre(), result.rol());
+    }
+
+    @Test
+    void getUserById_usuarioNoExiste_deberiaLanzarExcepcion() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> userService.getUserById(1L));
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void getUserByEmail_usuarioExiste_deberiaRetornarDTO() {
+        when(userRepository.findByEmail("juan@example.com")).thenReturn(Optional.of(user));
+
+        UserResponseDTO result = userService.getUserByEmail("juan@example.com");
+
+        assertEquals(user.getNombre(), result.nombre());
+        assertEquals(user.getEmail(), result.email());
+    }
+
+    @Test
+    void getUserByEmail_usuarioNoExiste_deberiaLanzarExcepcion() {
+        when(userRepository.findByEmail("juan@example.com")).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> userService.getUserByEmail("juan@example.com"));
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void registrarUsuario_datosValidos_deberiaCrearUsuario() {
+        UserRequestDTO request = new UserRequestDTO("Juan", "juan@example.com", "1234", role);
+
+        when(userRepository.findByEmail("juan@example.com")).thenReturn(Optional.empty());
+        when(roleRepository.findByNombre("CLIENTE")).thenReturn(Optional.of(role));
+        when(passwordEncoder.encode("1234")).thenReturn("encoded1234");
+        when(userRepository.findAll()).thenReturn(List.of());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(999L);
+            return u;
+        });
+
         UserResponseDTO response = userService.registrarUsuario(request);
 
-        // 🔹 4️⃣ Validaciones
-        assertNotNull(response);
-        assertNotNull(response.getId(), "El usuario registrado debe tener un ID");
-        assertEquals("Carlos Perez", response.getNombre());
-        assertEquals("carlos.perez@example.com", response.getEmail());
-        assertEquals("Cliente", response.getRol()); // 🔥 Asegurar que se guardó el rol correcto
-
-        // 🔹 5️⃣ Verificar que el usuario realmente está en la base de datos
-        Optional<User> usuarioGuardado = userRepository.findByEmail("carlos.perez@example.com");
-        assertTrue(usuarioGuardado.isPresent(), "El usuario debería haberse guardado en la base de datos");
-        assertEquals("Carlos Perez", usuarioGuardado.get().getNombre());
+        assertEquals("Juan", response.nombre());
+        assertEquals("juan@example.com", response.email());
+        assertEquals("CLIENTE", response.rol());
+        assertEquals(999L, response.usuarioId());
     }
+
+
     @Test
-    void testObtenerRolesDeLaBaseDeDatos() {
-        // Act: Obtener todos los roles
-        List<Role> roles = roleRepository.findAll();
+    void registrarUsuario_emailExistente_deberiaLanzarExcepcion() {
+        UserRequestDTO request = new UserRequestDTO("Juan", "juan@example.com", "1234", role);
 
-        // Mostrar los roles en la consola
-        System.out.println("🔍 Roles en la base de datos: " + roles);
+        when(userRepository.findByEmail("juan@example.com")).thenReturn(Optional.of(user));
 
-        // Assert: Asegurar que no está vacío
-        assertFalse(roles.isEmpty(), "La lista de roles no debería estar vacía");
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> userService.registrarUsuario(request));
 
-        // Opcional: Verificar si existe "Admin"
-        boolean existeAdmin = roles.stream().anyMatch(role -> "Admin".equalsIgnoreCase(role.getNombre()));
-        assertTrue(existeAdmin, "El rol 'Admin' debería existir en la base de datos");
+        assertEquals("El correo ya está registrado", ex.getMessage());
     }
+
+
     @Test
-  void testBuscarRolPorNombre() {
-      Optional<Role> adminRole = roleRepository.findByNombre("Admin");
+    void registrarUsuario_rolNoExiste_deberiaLanzarExcepcion() {
+        Role invalidRole = new Role();
+        invalidRole.setNombre("REPARTIDOR");
 
-      System.out.println("🔍 Resultado de buscar 'Admin': " + adminRole);
+        UserRequestDTO request = new UserRequestDTO("Juan", "juan@example.com", "1234", invalidRole);
 
-      assertTrue(adminRole.isPresent(), "El rol 'Admin' debería existir en la base de datos");
-  }
+        when(userRepository.findByEmail("juan@example.com")).thenReturn(Optional.empty());
+        when(roleRepository.findByNombre("REPARTIDOR")).thenReturn(Optional.empty());
 
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> userService.registrarUsuario(request));
+
+        assertEquals("El rol no existe en la base de datos: REPARTIDOR", ex.getMessage());
+    }
+
+
+    @Test
+    void deleteUser_usuarioExiste_deberiaEliminar() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        assertDoesNotThrow(() -> userService.deleteUser(1L));
+
+        verify(userRepository, times(1)).delete(user);
+    }
+
+    @Test
+    void deleteUser_usuarioNoExiste_deberiaLanzarExcepcion() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> userService.deleteUser(1L));
+
+        assertEquals("Usuario no encontrado", ex.getMessage());
+    }
 }
-
-*/

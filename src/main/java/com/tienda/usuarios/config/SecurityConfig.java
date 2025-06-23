@@ -55,6 +55,7 @@ public class SecurityConfig {
                 .requestMatchers("/repartidor/**").hasRole("REPARTIDOR")
                 .requestMatchers("/usuarios/*/internal").permitAll()
                 .requestMatchers("/usuarios/**").authenticated()
+                .requestMatchers("/dummy/secure").authenticated()
                 .anyRequest().permitAll()
                 
             )
