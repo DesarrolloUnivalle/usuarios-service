@@ -1,16 +1,12 @@
 name: Deploy Usuarios Service
-
 on:
   push:
     branches:
       - main
-      - test-workflow
-
 env:
   SERVICE_NAME: usuarios-service
   DOCKER_IMAGE: ${{ secrets.DOCKER_USERNAME }}/usuarios-service
   K8S_DIR: kubernetes
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -24,41 +20,31 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-
       - name: Build and test
         run: |
           mvn clean package
           mvn test
-
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Build and push Docker image
         run: |
           docker build -t ${{ env.DOCKER_IMAGE }}:latest .
           docker push ${{ env.DOCKER_IMAGE }}:latest
-
-      # ========================
-      # === Despliegue en GKE ===
-      # ========================
       - name: Authenticate with GCP
         uses: google-github-actions/auth@v2
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
-
       - name: Set up gcloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: gcp-despliegue-desarrollo 
           install_components: 'gke-gcloud-auth-plugin'
-
       - name: Configure kubectl
         run: |
           gcloud container clusters get-credentials cluster-desarrollo --zone us-central1-c --project gcp-despliegue-desarrollo
-
       - name: Deploy to GKE
         run: |
           export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
@@ -66,7 +52,6 @@ jobs:
           kubectl apply -f ${{ env.K8S_DIR }}/deployment-processed.yml
           kubectl apply -f ${{ env.K8S_DIR }}/service.yml
           kubectl rollout status deployment/${{ env.SERVICE_NAME }}-deployment --timeout=120s
-
       - name: Debug deployment failure
         if: failure()
         run: |
@@ -78,22 +63,16 @@ jobs:
           
           echo "==== LOGS ===="
           kubectl logs $(kubectl get pod -l app=${{ env.SERVICE_NAME }} -o jsonpath="{.items[0].metadata.name}")
-
-      # ==================================
-      # === Despliegue LOCAL con Minikube ===
-      # ==================================
       - name: Install Minikube
         run: |
           curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
           sudo install minikube-linux-amd64 /usr/local/bin/minikube
           minikube version
-
       - name: Start Minikube
         run: |
           minikube start --driver=docker
           minikube addons enable ingress
           minikube addons enable metrics-server
-
       - name: Deploy to Minikube
         run: |
           eval $(minikube -p minikube docker-env)
