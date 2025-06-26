@@ -51,6 +51,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Usa JWT sin sesiones
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/auth/login", "/auth/register").permitAll()
+                .requestMatchers("/usuarios", "/usuarios/", "/usuarios/inicio", "/usuarios/public","/usuarios/auth/login","usuarios/auth/register").permitAll()
                 .requestMatchers("/admin/**").hasRole("ADMIN") 
                 .requestMatchers("/repartidor/**").hasRole("REPARTIDOR")
                 .requestMatchers("/usuarios/*/internal").permitAll()
